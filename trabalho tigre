@@ -1,0 +1,230 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define MAX_DESC_SIZE 100
+
+typedef struct TaskNode {
+    int taskID;
+    char taskDesc[MAX_DESC_SIZE];
+    struct TaskNode* nextNode;
+} TASK_NODE;
+
+typedef struct TaskQueue {
+    TASK_NODE* headNode;
+    TASK_NODE* tailNode;
+} TASK_QUEUE;
+
+typedef struct TaskStack {
+    TASK_NODE* topNode;
+} TASK_STACK;
+
+typedef struct TaskList {
+    TASK_NODE* firstNode;
+} TASK_LIST;
+
+TASK_QUEUE pendingTasks = {NULL, NULL};
+TASK_LIST finishedTasks = {NULL};
+TASK_STACK draftTasks = {NULL};
+
+// Function prototypes
+TASK_NODE* createTaskNode(int id, char* description);
+void addTaskToQueue(TASK_QUEUE* queue, TASK_NODE* newTask);
+TASK_NODE* removeTaskFromQueue(TASK_QUEUE* queue);
+void pushTaskToStack(TASK_STACK* stack, TASK_NODE* newTask);
+TASK_NODE* popTaskFromStack(TASK_STACK* stack);
+void addTaskToList(TASK_LIST* list, TASK_NODE* newTask);
+TASK_NODE* removeTaskFromList(TASK_LIST* list, int id);
+void showMenu();
+
+int main() {
+    int option;
+    printf("################# TASK MANAGER SYSTEM #################\n");
+
+    do {
+        showMenu();
+        printf("Choose an option: ");
+        scanf("%d", &option);
+
+        switch (option) {
+            case 1: {
+                // CREATE A TASK, THEN ADD TO PENDING QUEUE
+                int taskId;
+                char description[MAX_DESC_SIZE];
+
+                printf("Enter Task ID (number): ");
+                scanf("%d", &taskId);
+
+                getchar();
+                printf("Enter Task Description (string): ");
+                fgets(description, MAX_DESC_SIZE, stdin);
+                description[strcspn(description, "\n")] = '\0';
+
+                TASK_NODE* newTask = createTaskNode(taskId, description);
+                addTaskToQueue(&pendingTasks, newTask);
+                break;
+            }
+            case 2:
+                // SEE ALL TASKS FROM PENDING QUEUE
+                printf("Printing All Pending Tasks:\n");
+                TASK_NODE* currentTask = pendingTasks.headNode;
+                while (currentTask != NULL) {
+                    printf("ID: %d, Description: %s\n", currentTask->taskID, currentTask->taskDesc);
+                    currentTask = currentTask->nextNode;
+                }
+                break;
+
+            case 3: {
+                // COMPLETE FIRST PENDING TASK
+                TASK_NODE* taskToComplete = removeTaskFromQueue(&pendingTasks);
+                if (taskToComplete != NULL) {
+                    printf("Task Completed: ID %d, Description: %s\n", taskToComplete->taskID, taskToComplete->taskDesc);
+                    addTaskToList(&finishedTasks, taskToComplete);
+                } else {
+                    printf("No pending tasks\n");
+                }
+                break;
+            }
+            case 4:
+                // SEE ALL TASKS FROM COMPLETED LIST
+                printf("Printing All Completed Tasks:\n");
+                TASK_NODE* current = finishedTasks.firstNode;
+                while (current != NULL) {
+                    printf("ID: %d, Description: %s\n", current->taskID, current->taskDesc);
+                    current = current->nextNode;
+                }
+                break;
+            case 5: {
+                // SET COMPLETED TASK TO DRAFT
+                int taskId;
+                printf("Enter Task ID (number): ");
+                scanf("%d", &taskId);
+
+                TASK_NODE* task = removeTaskFromList(&finishedTasks, taskId);
+                if (task != NULL) {
+                    pushTaskToStack(&draftTasks, task);
+                }
+                break;
+            }
+            case 6:
+                // SEE ALL TASKS FROM DRAFT STACK
+                printf("Printing All Draft Tasks:\n");
+                TASK_NODE* temp = draftTasks.topNode;
+                while (temp != NULL) {
+                    printf("ID: %d, Description: %s\n", temp->taskID, temp->taskDesc);
+                    temp = temp->nextNode;
+                }
+                break;
+
+            case 7: {
+                // SET LAST DRAFT AS PENDING TASK
+                TASK_NODE* lastTask = popTaskFromStack(&draftTasks);
+                if (lastTask != NULL) {
+                    addTaskToQueue(&pendingTasks, lastTask);
+                }
+                break;
+            }
+            case 0:
+                printf("Exiting program\n");
+                break;
+
+            default:
+                printf("Invalid choice\n");
+                break;
+        }
+    } while (option != 0);
+
+    printf("################# SYSTEM SHUT DOWN #################\n");
+    return 0;
+}
+
+// Function definitions
+
+TASK_NODE* createTaskNode(int id, char* description) {
+    TASK_NODE* newTask = (TASK_NODE*)malloc(sizeof(TASK_NODE));
+    newTask->taskID = id;
+    strcpy(newTask->taskDesc, description);
+    newTask->nextNode = NULL;
+    return newTask;
+}
+
+void addTaskToQueue(TASK_QUEUE* queue, TASK_NODE* newTask) {
+    if (queue->tailNode == NULL) {
+        queue->headNode = queue->tailNode = newTask;
+    } else {
+        queue->tailNode->nextNode = newTask;
+        queue->tailNode = newTask;
+    }
+}
+
+TASK_NODE* removeTaskFromQueue(TASK_QUEUE* queue) {
+    if (queue->headNode == NULL) {
+        return NULL;
+    }
+
+    TASK_NODE* temp = queue->headNode;
+    queue->headNode = queue->headNode->nextNode;
+
+    if (queue->headNode == NULL) {
+        queue->tailNode = NULL;
+    }
+
+    temp->nextNode = NULL;
+    return temp;
+}
+
+void pushTaskToStack(TASK_STACK* stack, TASK_NODE* newTask) {
+    newTask->nextNode = stack->topNode;
+    stack->topNode = newTask;
+}
+
+TASK_NODE* popTaskFromStack(TASK_STACK* stack) {
+    if (stack->topNode == NULL) {
+        return NULL;
+    }
+
+    TASK_NODE* temp = stack->topNode;
+    stack->topNode = stack->topNode->nextNode;
+    temp->nextNode = NULL;
+    return temp;
+}
+
+void addTaskToList(TASK_LIST* list, TASK_NODE* newTask) {
+    newTask->nextNode = list->firstNode;
+    list->firstNode = newTask;
+}
+
+TASK_NODE* removeTaskFromList(TASK_LIST* list, int id) {
+    TASK_NODE* current = list->firstNode;
+    TASK_NODE* prev = NULL;
+
+    while (current != NULL && current->taskID != id) {
+        prev = current;
+        current = current->nextNode;
+    }
+
+    if (current == NULL) {
+        return NULL;
+    }
+
+    if (prev == NULL) {
+        list->firstNode = current->nextNode;
+    } else {
+        prev->nextNode = current->nextNode;
+    }
+
+    current->nextNode = NULL;
+    return current;
+}
+
+void showMenu() {
+    printf("\nMenu:\n");
+    printf("1 - Create New Pending Task\n");
+    printf("2 - See All Pending Tasks\n");
+    printf("3 - Complete First Pending Task\n");
+    printf("4 - See All Completed Tasks\n");
+    printf("5 - Set Completed Task as Draft by its ID\n");
+    printf("6 - See All Draft Tasks\n");
+    printf("7 - Set Last Draft Task as Pending Task\n");
+    printf("0 - Exit\n");
+}
